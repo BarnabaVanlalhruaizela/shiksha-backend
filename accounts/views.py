@@ -124,6 +124,10 @@ class LoginView(APIView):
             status=status.HTTP_200_OK,
         )
 
+        # Clear old cookies first
+        response.delete_cookie("access", domain=".shikshacom.com")
+        response.delete_cookie("refresh", domain=".shikshacom.com")
+
         response.set_cookie(
             key="access",
             value=str(refresh.access_token),
@@ -131,6 +135,7 @@ class LoginView(APIView):
             secure=True,
             samesite="None",
             domain=".shikshacom.com",
+            max_age=600,
         )
 
         response.set_cookie(
@@ -140,6 +145,7 @@ class LoginView(APIView):
             secure=True,
             samesite="None",
             domain=".shikshacom.com",
+            max_age=60 * 60 * 24 * 7,
         )
 
         log_auth_event(request, AuthEvent.EVENT_LOGIN_SUCCESS, user=user)
@@ -303,18 +309,11 @@ class RefreshView(APIView):
             return Response(status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            old_token = RefreshToken(refresh_token)
+            token = RefreshToken(refresh_token)
 
-            # Extract user_id safely from token payload
-            user_id = old_token["user_id"]
-
-            # Blacklist old refresh token (since rotation enabled)
-            old_token.blacklist()
-
-            # Get user safely
+            user_id = token["user_id"]
             user = User.objects.get(id=user_id)
 
-            # Create new refresh token
             new_refresh = RefreshToken.for_user(user)
             new_access = str(new_refresh.access_token)
 
@@ -327,6 +326,7 @@ class RefreshView(APIView):
                 secure=True,
                 samesite="None",
                 domain=".shikshacom.com",
+                max_age=600,
             )
 
             response.set_cookie(
@@ -336,6 +336,7 @@ class RefreshView(APIView):
                 secure=True,
                 samesite="None",
                 domain=".shikshacom.com",
+                max_age=60 * 60 * 24 * 7,
             )
 
             return response
