@@ -169,13 +169,6 @@ class SubjectTeacherAdmin(admin.ModelAdmin):
     search_fields = ("teacher__email", "subject__name")
 
 
-@admin.register(SubjectTeacher)
-class SubjectTeacherAdmin(admin.ModelAdmin):
-    list_display = ("teacher", "subject", "assigned_at")
-    list_filter = ("subject__course", "subject")
-    search_fields = ("teacher__email", "subject__name")
-
-
 class QuestionInline(admin.TabularInline):
     model = Question
     extra = 0
