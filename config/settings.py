@@ -56,8 +56,9 @@ INSTALLED_APPS = [
     "payments",
     "assignments",
     "quizzes",
-    "livestream",
+
     "django_extensions",
+    "livestream.apps.LivestreamConfig",
 ]
 
 MIDDLEWARE = [
