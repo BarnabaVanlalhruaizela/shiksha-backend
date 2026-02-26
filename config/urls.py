@@ -9,6 +9,8 @@ urlpatterns = [
     path("api/courses/", include("courses.urls")),
     path("api/assignments/", include("assignments.urls")),
     path("api/", include("quizzes.urls")),
+    path("livekit/", include("livekit.urls")),
+
 
 ]
 
