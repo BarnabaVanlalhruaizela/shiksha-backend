@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "payments",
     "assignments",
     "quizzes",
+    "livestream",
 ]
 
 MIDDLEWARE = [
