@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Profile, Role, UserRole
+from .models import User, Profile, Role, UserRole, TeacherProfile
 
 
 # =========================
@@ -61,3 +61,21 @@ class RoleAdmin(admin.ModelAdmin):
 @admin.register(UserRole)
 class UserRoleAdmin(admin.ModelAdmin):
     list_display = ("user", "role", "is_active", "approved_by", "approved_at")
+
+
+# =========================
+# TEACHER PROFILE ADMIN
+# =========================
+
+@admin.register(TeacherProfile)
+class TeacherProfileAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "qualification",
+        "rating",
+        "is_approved",
+        "created_at",
+    )
+
+    list_filter = ("is_approved",)
+    search_fields = ("user__email", "qualification")
