@@ -1,5 +1,5 @@
 from rest_framework import status
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, IsAuthenticated, AllowAny, IsAdminUser
 from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
@@ -8,13 +8,13 @@ from django.shortcuts import redirect
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser, BasePermission
 from rest_framework.exceptions import ValidationError
-from rest_framework_simplejwt.tokens import RefreshToken  # type: ignore
-from django.db.models import Prefetch
-from enrollments.models import Enrollment
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
+from django.db.models import Prefetch
+
+from enrollments.models import Enrollment
 
 from accounts.audit import log_auth_event
 from accounts.models import (
@@ -24,6 +24,7 @@ from accounts.models import (
     Role,
     UserRole,
 )
+
 from accounts.throttles import (
     LoginRateThrottle,
     ResendVerificationRateThrottle,
@@ -32,17 +33,19 @@ from accounts.throttles import (
 from .serializers import (
     SignupSerializer,
     UserMeSerializer,
-    UserUpdateSerializer,
 )
+
 from .permissions import IsEmailVerified
 
 
-#  VERIFIED USERS ONLY
+# =====================================================
+# VERIFIED USERS ONLY
+# =====================================================
+
 class MeView(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified]
 
     def get(self, request):
-
         user = (
             User.objects
             .select_related("profile")
@@ -61,7 +64,10 @@ class MeView(APIView):
         return Response(UserMeSerializer(user).data)
 
 
-#  SIGNUP — PUBLIC, NO JWT
+# =====================================================
+# SIGNUP — PUBLIC
+# =====================================================
+
 class SignupView(APIView):
     permission_classes = [AllowAny]
 
@@ -70,14 +76,15 @@ class SignupView(APIView):
         serializer.is_valid(raise_exception=True)
 
         user = serializer.save()
-        user.is_verified = False
-        user.save(update_fields=["is_verified"])
 
         token = EmailVerificationToken.generate(user)
 
-        verify_link = f"https://api.shikshacom.com/api/verify-email/?token={token.token}"
+        verify_link = (
+            f"https://api.shikshacom.com/api/verify-email/"
+            f"?token={token.token}"
+        )
 
-        # Email sending disabled for now (OK)
+        # Enable in production
         # send_mail(
         #     subject="Verify your email",
         #     message=f"Click to verify your email:\n{verify_link}",
@@ -91,13 +98,16 @@ class SignupView(APIView):
         )
 
 
-#  LOGIN — JWT ISSUED ONLY IF VERIFIED
+# =====================================================
+# LOGIN — JWT ISSUED ONLY IF VERIFIED
+# =====================================================
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
-        email = request.data.get("email")
+        email = request.data.get("email", "").strip().lower()
         password = request.data.get("password")
 
         if not email or not password:
@@ -124,7 +134,7 @@ class LoginView(APIView):
             status=status.HTTP_200_OK,
         )
 
-        # Clear old cookies first
+        # Clear old cookies
         response.delete_cookie("access", domain=".shikshacom.com")
         response.delete_cookie("refresh", domain=".shikshacom.com")
 
@@ -153,12 +163,20 @@ class LoginView(APIView):
         return response
 
 
-# ✅ EMAIL VERIFICATION — GET + REDIRECT
+# =====================================================
+# EMAIL VERIFICATION
+# =====================================================
+
 class VerifyEmailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
         token_value = request.query_params.get("token")
+
+        if not token_value:
+            return redirect(
+                "https://shikshacom.com/email-verified?status=failed"
+            )
 
         try:
             token = EmailVerificationToken.objects.select_related("user").get(
@@ -191,13 +209,16 @@ class VerifyEmailView(APIView):
         )
 
 
-# 🔁 RESEND VERIFICATION EMAIL — PUBLIC
+# =====================================================
+# RESEND VERIFICATION EMAIL
+# =====================================================
+
 class ResendVerificationEmailView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [ResendVerificationRateThrottle]
 
     def post(self, request):
-        email = request.data.get("email")
+        email = request.data.get("email", "").strip().lower()
 
         user = User.objects.filter(email=email).first()
         if not user:
@@ -229,16 +250,20 @@ class ResendVerificationEmailView(APIView):
         return Response({"detail": "Verification email resent."})
 
 
+# =====================================================
+# REQUEST TEACHER ROLE
+# =====================================================
+
 class RequestTeacherRoleView(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified]
 
     def post(self, request):
         user = request.user
 
-        if user.has_role("teacher"):
+        if user.has_role(Role.TEACHER):
             raise ValidationError("You are already a teacher.")
 
-        teacher_role = Role.objects.get(name="teacher")
+        teacher_role = Role.objects.get(name=Role.TEACHER)
 
         if UserRole.objects.filter(user=user, role=teacher_role).exists():
             raise ValidationError("Teacher role already requested.")
@@ -255,6 +280,10 @@ class RequestTeacherRoleView(APIView):
         )
 
 
+# =====================================================
+# APPROVE TEACHER ROLE (Superuser Works Here)
+# =====================================================
+
 class ApproveTeacherRoleView(APIView):
     permission_classes = [IsAdminUser]
 
@@ -263,7 +292,7 @@ class ApproveTeacherRoleView(APIView):
         if not user_id:
             raise ValidationError("user_id is required.")
 
-        teacher_role = Role.objects.get(name="teacher")
+        teacher_role = Role.objects.get(name=Role.TEACHER)
 
         try:
             user_role = UserRole.objects.get(
@@ -282,6 +311,10 @@ class ApproveTeacherRoleView(APIView):
         )
 
 
+# =====================================================
+# LOGOUT
+# =====================================================
+
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -294,10 +327,20 @@ class LogoutView(APIView):
         return response
 
 
+# =====================================================
+# PROFILE COMPLETE PERMISSION
+# =====================================================
+
 class IsProfileComplete(BasePermission):
     def has_permission(self, request, view):
-        return request.user.profile.is_complete
+        if not request.user.is_authenticated:
+            return False
+        return hasattr(request.user, "profile") and request.user.profile.is_complete
 
+
+# =====================================================
+# REFRESH TOKEN
+# =====================================================
 
 class RefreshView(APIView):
     permission_classes = [AllowAny]
@@ -310,18 +353,15 @@ class RefreshView(APIView):
 
         try:
             token = RefreshToken(refresh_token)
-
-            user_id = token["user_id"]
-            user = User.objects.get(id=user_id)
+            user = User.objects.get(id=token["user_id"])
 
             new_refresh = RefreshToken.for_user(user)
-            new_access = str(new_refresh.access_token)
 
             response = Response({"detail": "refreshed"})
 
             response.set_cookie(
                 key="access",
-                value=new_access,
+                value=str(new_refresh.access_token),
                 httponly=True,
                 secure=True,
                 samesite="None",

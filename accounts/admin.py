@@ -1,12 +1,14 @@
+from .models import SubjectTeacher
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.core.exceptions import ValidationError
+
 from .models import User, Profile, Role, UserRole
 from courses.models import Course, Subject, Chapter
 from payments.models import Order, Payment
 from enrollments.models import Enrollment
 from assignments.models import Assignment, AssignmentSubmission
 from livestream.models import LiveSession, LiveSessionAttendance
-
 from quizzes.models import (
     Quiz,
     Question,
@@ -40,7 +42,7 @@ class CustomUserAdmin(UserAdmin):
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Personal info", {"fields": ("username",)}),
+        ("Personal Info", {"fields": ("username",)}),
         ("Verification", {"fields": ("is_verified", "verified_at")}),
         (
             "Permissions",
@@ -54,7 +56,7 @@ class CustomUserAdmin(UserAdmin):
                 )
             },
         ),
-        ("Important dates", {"fields": ("last_login", "date_joined")}),
+        ("Important Dates", {"fields": ("last_login", "date_joined")}),
     )
 
     ordering = ("email",)
@@ -63,11 +65,40 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ("user",)
+    list_display = ("user", "full_name", "phone")
+    search_fields = ("user__email", "full_name")
 
 
-admin.site.register(Role)
-admin.site.register(UserRole)
+# =========================
+# ROLE ADMIN (HARDENED)
+# =========================
+
+
+@admin.register(Role)
+class RoleAdmin(admin.ModelAdmin):
+    list_display = ("name", "description")
+    search_fields = ("name",)
+    ordering = ("name",)
+
+
+@admin.register(UserRole)
+class UserRoleAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "role",
+        "is_active",
+        "is_primary",
+        "approved_by",
+        "approved_at",
+    )
+
+    list_filter = ("role", "is_active", "is_primary")
+    search_fields = ("user__email", "role__name")
+
+    def save_model(self, request, obj, form, change):
+        obj.full_clean()  # enforce model validation
+        super().save_model(request, obj, form, change)
+
 
 # =========================
 # COURSE ADMIN
@@ -90,7 +121,7 @@ class SubjectAdmin(admin.ModelAdmin):
     filter_horizontal = ("teachers",)
 
     def get_teachers(self, obj):
-        return ", ".join([t.email for t in obj.teachers.all()])
+        return ", ".join(obj.teachers.values_list("email", flat=True))
 
     get_teachers.short_description = "Teachers"
 
@@ -101,13 +132,14 @@ class ChapterAdmin(admin.ModelAdmin):
     list_filter = ("subject",)
     ordering = ("subject", "order")
 
+
 # =========================
 # PAYMENT ADMIN
 # =========================
 
-
 admin.site.register(Order)
 admin.site.register(Payment)
+
 
 # =========================
 # ENROLLMENT ADMIN
@@ -120,6 +152,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
     list_filter = ("status", "enrolled_at")
     search_fields = ("user__email", "course__title")
 
+
 # =========================
 # ASSIGNMENT ADMIN
 # =========================
@@ -129,6 +162,7 @@ class AssignmentSubmissionInline(admin.TabularInline):
     model = AssignmentSubmission
     extra = 0
     readonly_fields = ("student", "submitted_file", "submitted_at")
+    can_delete = False
 
 
 @admin.register(Assignment)
@@ -139,15 +173,18 @@ class AssignmentAdmin(admin.ModelAdmin):
         "due_date",
         "created_at",
     )
+
     list_filter = (
         "due_date",
         "chapter__subject__course",
     )
+
     search_fields = (
         "title",
         "chapter__subject__name",
         "chapter__subject__course__title",
     )
+
     ordering = ("-created_at",)
     inlines = [AssignmentSubmissionInline]
 
@@ -159,15 +196,19 @@ class AssignmentSubmissionAdmin(admin.ModelAdmin):
         "student",
         "submitted_at",
     )
+
     list_filter = (
         "submitted_at",
         "assignment__chapter__subject__course",
     )
+
     search_fields = (
         "student__email",
         "assignment__title",
     )
+
     ordering = ("-submitted_at",)
+
 
 # =========================
 # QUIZ ADMIN
@@ -306,25 +347,33 @@ class StudentAnswerAdmin(admin.ModelAdmin):
     )
 
 
+# =========================
+# LIVE SESSION ADMIN
+# =========================
+
+
 @admin.register(LiveSession)
 class LiveSessionAdmin(admin.ModelAdmin):
     list_display = (
         "title",
-        "course",
         "subject",
         "created_by",
         "start_time",
         "end_time",
         "status",
     )
-    list_filter = ("status", "course", "subject")
+
+    list_filter = ("status", "subject__course", "subject")
     search_fields = ("title", "room_name", "created_by__email")
+
     readonly_fields = ("room_name",)
     ordering = ("-start_time",)
+
     actions = ["mark_cancelled"]
 
     def mark_cancelled(self, request, queryset):
         queryset.update(status=LiveSession.STATUS_CANCELLED)
+
     mark_cancelled.short_description = "Mark selected sessions as Cancelled"
 
 
@@ -335,7 +384,7 @@ class LiveSessionAttendanceAdmin(admin.ModelAdmin):
         "user",
         "joined_at",
         "left_at",
-        "duration",
+        "duration_display",
     )
 
     list_filter = ("session",)
@@ -349,9 +398,22 @@ class LiveSessionAttendanceAdmin(admin.ModelAdmin):
         "left_at",
     )
 
-    def duration(self, obj):
+    def duration_display(self, obj):
         if obj.joined_at and obj.left_at:
             return obj.left_at - obj.joined_at
         return "—"
 
-    duration.short_description = "Duration"
+    duration_display.short_description = "Duration"
+
+
+class SubjectTeacherInline(admin.TabularInline):
+    model = SubjectTeacher
+    extra = 1
+
+
+@admin.register(Subject)
+class SubjectAdmin(admin.ModelAdmin):
+    list_display = ("name", "course", "order")
+    list_filter = ("course",)
+    ordering = ("course", "order")
+    inlines = [SubjectTeacherInline]

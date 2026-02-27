@@ -84,3 +84,42 @@ class CourseDetail(models.Model):
 
     def __str__(self):
         return f"Details of {self.course.title}"
+
+
+class SubjectTeacher(models.Model):
+    ROLE_PRIMARY = "PRIMARY"
+    ROLE_ASSISTANT = "ASSISTANT"
+
+    ROLE_CHOICES = [
+        (ROLE_PRIMARY, "Primary Teacher"),
+        (ROLE_ASSISTANT, "Assistant"),
+    ]
+
+    subject = models.ForeignKey(
+        "Subject",
+        on_delete=models.CASCADE,
+        related_name="subject_teachers"
+    )
+
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="subject_assignments"
+    )
+
+    display_role = models.CharField(
+        max_length=20,
+        choices=ROLE_CHOICES,
+        default=ROLE_PRIMARY
+    )
+
+    order = models.PositiveIntegerField(default=1)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("subject", "teacher")
+        ordering = ["order"]
+
+    def __str__(self):
+        return f"{self.subject.name} → {self.teacher.email}"

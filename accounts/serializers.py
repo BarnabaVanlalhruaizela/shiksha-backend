@@ -6,9 +6,10 @@ from django.db import transaction
 from .models import User, Profile, Role, UserRole
 
 
-# ===============================
-# READ SERIALIZER (For /me/)
-# ===============================
+# =====================================================
+# PROFILE READ SERIALIZER (/me/)
+# =====================================================
+
 class ProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     avatar_type = serializers.SerializerMethodField()
@@ -32,9 +33,10 @@ class ProfileSerializer(serializers.ModelSerializer):
         return obj.avatar_value()
 
 
-# ===============================
-# WRITE SERIALIZER (For Updates)
-# ===============================
+# =====================================================
+# PROFILE UPDATE SERIALIZER
+# =====================================================
+
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
@@ -46,11 +48,12 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         ]
 
 
-# ===============================
+# =====================================================
 # UPDATE USER + PROFILE
-# ===============================
+# =====================================================
+
 class UserUpdateSerializer(serializers.ModelSerializer):
-    profile = ProfileUpdateSerializer()
+    profile = ProfileUpdateSerializer(required=False)
 
     class Meta:
         model = User
@@ -64,11 +67,11 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
 
-        # Update profile
+        # Update profile safely
         if profile_data:
             profile = instance.profile
 
-            # Ensure only one avatar type is stored
+            # Only one avatar type allowed
             if profile_data.get("avatar_image"):
                 profile.avatar_emoji = None
 
@@ -83,9 +86,10 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         return instance
 
 
-# ===============================
-# USER ME SERIALIZER
-# ===============================
+# =====================================================
+# USER /me/ SERIALIZER
+# =====================================================
+
 class UserMeSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer(read_only=True)
     roles = serializers.SerializerMethodField()
@@ -103,15 +107,18 @@ class UserMeSerializer(serializers.ModelSerializer):
         )
 
     def get_roles(self, obj):
-        return [
-            user_role.role.name
-            for user_role in obj.user_roles.filter(is_active=True)
-        ]
+        return list(
+            obj.user_roles
+            .filter(is_active=True)
+            .values_list("role__name", flat=True)
+        )
 
     def get_enrollments(self, obj):
-        enrollments = obj.enrollments.filter(
-            status="ACTIVE"
-        ).select_related("course")
+        enrollments = (
+            obj.enrollments
+            .filter(status="ACTIVE")
+            .select_related("course")
+        )
 
         return [
             {
@@ -123,9 +130,10 @@ class UserMeSerializer(serializers.ModelSerializer):
         ]
 
 
-# ===============================
-# SIGNUP
-# ===============================
+# =====================================================
+# SIGNUP SERIALIZER
+# =====================================================
+
 class SignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
@@ -134,13 +142,17 @@ class SignupSerializer(serializers.ModelSerializer):
         fields = ("email", "username", "password")
 
     def validate_email(self, value):
+        value = value.strip().lower()
+
         if User.objects.filter(email__iexact=value).exists():
             raise ValidationError("Email is already registered.")
-        return value.lower()
+
+        return value
 
     def validate_username(self, value):
         if User.objects.filter(username__iexact=value).exists():
             raise ValidationError("Username is already taken.")
+
         return value
 
     def validate_password(self, value):
@@ -150,20 +162,26 @@ class SignupSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         user = User.objects.create_user(
-            email=validated_data["email"].lower(),
+            email=validated_data["email"],
             username=validated_data["username"],
             password=validated_data["password"],
         )
 
+        # Ensure unverified by default
         user.is_verified = False
         user.save(update_fields=["is_verified"])
 
-        guest_role, _ = Role.objects.get_or_create(name="GUEST")
+        # IMPORTANT: Roles must be seeded beforehand
+        try:
+            guest_role = Role.objects.get(name=Role.GUEST)
+        except Role.DoesNotExist:
+            raise ValidationError("Default role not configured.")
 
         UserRole.objects.create(
             user=user,
             role=guest_role,
             is_active=True,
+            is_primary=True,
         )
 
         return user
