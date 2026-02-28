@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Course, Subject, Chapter
+from .models import Course, Subject, Chapter, SubjectTeacher
 
 
 # =========================
@@ -13,19 +13,38 @@ class CourseAdmin(admin.ModelAdmin):
     list_filter = ("created_at",)
 
 
+# =========================
+# SUBJECT TEACHER INLINE
+# =========================
+
+class SubjectTeacherInline(admin.TabularInline):
+    model = SubjectTeacher
+    extra = 1
+
+
+# =========================
+# SUBJECT ADMIN
+# =========================
+
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
     list_display = ("name", "course", "order", "get_teachers")
     list_filter = ("course",)
     ordering = ("course", "order")
     search_fields = ("name", "course__title")
-    filter_horizontal = ("teachers",)
+    inlines = [SubjectTeacherInline]
 
     def get_teachers(self, obj):
-        return ", ".join([t.email for t in obj.teachers.all()])
+        return ", ".join(
+            [st.teacher.email for st in obj.subject_teachers.all()]
+        )
 
     get_teachers.short_description = "Teachers"
 
+
+# =========================
+# CHAPTER ADMIN
+# =========================
 
 @admin.register(Chapter)
 class ChapterAdmin(admin.ModelAdmin):
