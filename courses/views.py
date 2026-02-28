@@ -11,7 +11,7 @@ from .serializers import CourseSerializer
 from .models import Course, Subject
 from .serializers import CourseSerializer, SubjectSerializer
 from django.db.models import Count, Q
-
+from django.utils import timezone
 # update
 from django.shortcuts import get_object_or_404
 
@@ -154,51 +154,47 @@ class SubjectDashboardView(APIView):
         ).exists():
             return Response(
                 {"detail": "Not enrolled."},
-                status=403
+                status=status.HTTP_403_FORBIDDEN
             )
 
-        # -----------------------------
+        # =====================================
         # ASSIGNMENTS
-        # -----------------------------
+        # =====================================
+
         assignments = Assignment.objects.filter(
             chapter__subject=subject
-        )
-
-        pending_assignments = assignments.filter(
-            due_date__gt=timezone.now()
-        ).exclude(
-            submissions__student=user
-        ).count()
-
-        completed_assignments = assignments.filter(
-            submissions__student=user
-        ).count()
+        ).distinct()
 
         total_assignments = assignments.count()
 
-        # -----------------------------
+        completed_assignments = assignments.filter(
+            submissions__student=user
+        ).distinct().count()
+
+        pending_assignments = total_assignments - completed_assignments
+
+        # =====================================
         # QUIZZES
-        # -----------------------------
+        # =====================================
+
         quizzes = Quiz.objects.filter(
             subject=subject,
             is_published=True
-        )
+        ).distinct()
 
-        pending_quiz = quizzes.exclude(
+        total_quizzes = quizzes.count()
+
+        completed_quizzes = quizzes.filter(
             attempts__student=user,
             attempts__status="SUBMITTED"
-        ).count()
+        ).distinct().count()
 
-        completed_quiz = quizzes.filter(
-            attempts__student=user,
-            attempts__status="SUBMITTED"
-        ).count()
+        pending_quizzes = total_quizzes - completed_quizzes
 
-        total_quiz = quizzes.count()
-
-        # -----------------------------
+        # =====================================
         # RESPONSE
-        # -----------------------------
+        # =====================================
+
         serializer = SubjectSerializer(subject)
 
         return Response({
@@ -213,12 +209,11 @@ class SubjectDashboardView(APIView):
             },
 
             "quizzes": {
-                "pending": pending_quiz,
-                "completed": completed_quiz,
-                "total": total_quiz,
+                "pending": pending_quizzes,
+                "completed": completed_quizzes,
+                "total": total_quizzes,
             },
 
-            # placeholder until you add models
             "recordingsCount": 0,
             "studyMaterialsCount": 0,
             "upcomingSessions": [],
