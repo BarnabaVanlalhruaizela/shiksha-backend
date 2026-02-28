@@ -42,7 +42,7 @@ class LiveSessionCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Invalid subject.")
 
         # 3️⃣ Subject Assignment Check
-        if not subject.teachers.filter(id=user.id).exists():
+        if not subject.subject_teachers.filter(id=user.id).exists():
             raise serializers.ValidationError(
                 "You are not assigned to this subject."
             )
