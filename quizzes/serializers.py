@@ -1,3 +1,6 @@
+from .models import Quiz
+
+from django.db.models import Avg, Max, Min, Count
 import uuid
 from django.db import transaction
 from django.utils import timezone
@@ -362,3 +365,49 @@ class TeacherQuizAttemptSerializer(serializers.ModelSerializer):
             "score",
             "submitted_at",
         ]
+
+
+class TeacherQuizAnalyticsSerializer(serializers.ModelSerializer):
+    subject_name = serializers.CharField(source="subject.name", read_only=True)
+    course_title = serializers.CharField(
+        source="subject.course.title",
+        read_only=True
+    )
+
+    total_attempts = serializers.IntegerField(read_only=True)
+    average_score = serializers.FloatField(read_only=True)
+    highest_score = serializers.FloatField(read_only=True)
+    lowest_score = serializers.FloatField(read_only=True)
+
+    submission_rate = serializers.SerializerMethodField()
+    is_expired = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Quiz
+        fields = [
+            "id",
+            "title",
+            "subject_name",
+            "course_title",
+            "due_date",
+            "is_published",
+            "is_expired",
+            "total_attempts",
+            "submission_rate",
+            "average_score",
+            "highest_score",
+            "lowest_score",
+        ]
+
+    def get_submission_rate(self, obj):
+        total_students = obj.subject.course.enrollments.filter(
+            status="ACTIVE"
+        ).count()
+
+        if total_students == 0:
+            return 0
+
+        return round((obj.total_attempts / total_students) * 100, 2)
+
+    def get_is_expired(self, obj):
+        return obj.due_date <= timezone.now()

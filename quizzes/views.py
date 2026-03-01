@@ -436,19 +436,20 @@ class TeacherDeleteQuizView(APIView):
 
 
 class TeacherSubjectQuizListView(generics.ListAPIView):
+    serializer_class = TeacherQuizAnalyticsSerializer
     permission_classes = [IsAuthenticated, IsEmailVerified]
 
     def get_queryset(self):
         user = self.request.user
         subject_id = self.kwargs["subject_id"]
 
-        # 🔐 Role check
+        # 🔐 Role Protection
         if not user.has_role("TEACHER"):
             raise PermissionDenied("Only teachers allowed.")
 
         # 🔐 Ensure teacher assigned to subject
         subject = get_object_or_404(
-            Subject.objects.prefetch_related("subject_teachers"),
+            Subject.objects.select_related("course"),
             id=subject_id
         )
 
@@ -457,10 +458,17 @@ class TeacherSubjectQuizListView(generics.ListAPIView):
         ).exists():
             raise PermissionDenied("Not assigned to this subject.")
 
+        # 📊 Annotate analytics
         return (
             Quiz.objects
             .filter(subject=subject)
-            .annotate(total_attempts=Count("attempts"))
+            .select_related("subject", "subject__course")
+            .annotate(
+                total_attempts=Count("attempts"),
+                average_score=Avg("attempts__score"),
+                highest_score=Max("attempts__score"),
+                lowest_score=Min("attempts__score"),
+            )
             .order_by("-created_at")
         )
 
