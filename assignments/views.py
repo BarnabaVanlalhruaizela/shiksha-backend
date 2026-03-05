@@ -53,13 +53,6 @@ class AssignmentDetailView(generics.RetrieveAPIView):
             .prefetch_related(submission_prefetch)
         )
 
-        # Attach user_submission
-        for obj in queryset:
-            obj.user_submission = (
-                obj.user_submission_list[0]
-                if obj.user_submission_list else None
-            )
-
         return queryset
 
     def retrieve(self, request, *args, **kwargs):
@@ -67,6 +60,12 @@ class AssignmentDetailView(generics.RetrieveAPIView):
         user = request.user
         subject = instance.chapter.subject
         course = subject.course
+
+        # ✅ FIX 3: Attach user_submission here after get_object() so it's not lost
+        instance.user_submission = (
+            instance.user_submission_list[0]
+            if instance.user_submission_list else None
+        )
 
         if user.has_role(Role.TEACHER):
             if not subject.subject_teachers.filter(teacher=user).exists():
@@ -79,7 +78,9 @@ class AssignmentDetailView(generics.RetrieveAPIView):
             ).exists():
                 raise PermissionDenied("Not authorized.")
 
-        return super().retrieve(request, *args, **kwargs)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
 
 # ==========================================
 # SUBMIT ASSIGNMENT VIEW
@@ -134,6 +135,8 @@ class SubmitAssignmentView(APIView):
             {"detail": "Submission successful."},
             status=status.HTTP_200_OK,
         )
+
+
 # ==========================================
 # COURSE ASSIGNMENTS LIST VIEW
 # ==========================================
@@ -174,13 +177,20 @@ class CourseAssignmentsView(generics.ListAPIView):
             "chapter__subject__course"
         ).prefetch_related(submission_prefetch).distinct()
 
+        return queryset
+
+    # ✅ FIX 3: Attach user_submission after queryset is evaluated, not inside get_queryset
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+
         for obj in queryset:
             obj.user_submission = (
                 obj.user_submission_list[0]
                 if obj.user_submission_list else None
             )
 
-        return queryset
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class TeacherCreateAssignmentView(APIView):

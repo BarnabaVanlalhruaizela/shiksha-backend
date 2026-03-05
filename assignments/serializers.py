@@ -2,7 +2,51 @@ from rest_framework import serializers
 from django.utils import timezone
 from .models import Assignment, AssignmentSubmission
 from courses.models import Chapter
+import os
 
+
+# ==========================================
+# FILE TYPE VALIDATOR
+# ==========================================
+
+# Blocked for security - dangerous executable/script extensions
+BLOCKED_EXTENSIONS = [
+    ".exe", ".bat", ".cmd", ".sh", ".bash",
+    ".php", ".py", ".rb", ".pl", ".cgi",
+    ".js", ".vbs", ".ps1", ".msi", ".dll",
+    ".com", ".scr", ".jar", ".app",
+]
+
+
+def validate_assignment_file(file):
+    """
+    Allows all file types except dangerous executables/scripts.
+    Suitable for any LMS platform (PC, Android, iPhone).
+    Max file size: 100MB
+    """
+    if file is None:
+        return file
+
+    # Check extension against blocked list
+    ext = os.path.splitext(file.name)[1].lower()
+    if ext in BLOCKED_EXTENSIONS:
+        raise serializers.ValidationError(
+            f"File type '{ext}' is not allowed for security reasons."
+        )
+
+    # Max file size: 100MB
+    max_size = 100 * 1024 * 1024
+    if file.size > max_size:
+        raise serializers.ValidationError(
+            "File too large. Maximum allowed size is 100MB."
+        )
+
+    return file
+
+
+# ==========================================
+# STUDENT SERIALIZERS
+# ==========================================
 
 class AssignmentListSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
@@ -14,6 +58,8 @@ class AssignmentListSerializer(serializers.ModelSerializer):
         source="chapter.subject.course.id",
         read_only=True
     )
+    # ✅ FIX 1: Added attachment so students can see uploaded files
+    attachment = serializers.FileField(read_only=True)
 
     class Meta:
         model = Assignment
@@ -24,6 +70,7 @@ class AssignmentListSerializer(serializers.ModelSerializer):
             "status",
             "subject_name",
             "course_id",
+            "attachment",
         )
 
     def get_status(self, obj):
@@ -91,7 +138,9 @@ class AssignmentDetailSerializer(serializers.ModelSerializer):
         return submission.submitted_at if submission else None
 
 
-# 🔐 TEACHER CREATE SERIALIZER
+# ==========================================
+# TEACHER SERIALIZERS
+# ==========================================
 
 class TeacherAssignmentCreateSerializer(serializers.ModelSerializer):
     chapter_id = serializers.UUIDField(write_only=True)
@@ -122,6 +171,10 @@ class TeacherAssignmentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Invalid chapter.")
         return value
 
+    # ✅ File type validation on create
+    def validate_attachment(self, value):
+        return validate_assignment_file(value)
+
     def create(self, validated_data):
         chapter_id = validated_data.pop("chapter_id")
         chapter = Chapter.objects.get(id=chapter_id)
@@ -150,6 +203,10 @@ class TeacherAssignmentUpdateSerializer(serializers.ModelSerializer):
             )
         return value
 
+    # ✅ File type validation on update
+    def validate_attachment(self, value):
+        return validate_assignment_file(value)
+
 
 class TeacherAssignmentListSerializer(serializers.ModelSerializer):
     chapter_name = serializers.CharField(
@@ -163,6 +220,8 @@ class TeacherAssignmentListSerializer(serializers.ModelSerializer):
         source="is_expired",
         read_only=True
     )
+    # ✅ FIX 2: Added attachment so teacher sees file in response after create/update
+    attachment = serializers.FileField(read_only=True)
 
     class Meta:
         model = Assignment
@@ -173,6 +232,7 @@ class TeacherAssignmentListSerializer(serializers.ModelSerializer):
             "due_date",
             "is_expired",
             "total_submissions",
+            "attachment",
         )
 
 
