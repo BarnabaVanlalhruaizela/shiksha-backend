@@ -1,9 +1,9 @@
+from corsheaders.defaults import default_headers
 from pathlib import Path
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 'config.wsgi.application'
 
 load_dotenv(BASE_DIR / ".env")
