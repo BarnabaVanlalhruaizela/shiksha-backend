@@ -1,3 +1,5 @@
+from .serializers import ChapterSerializer
+from .models import Chapter
 from django.db.models import Count
 from .models import SubjectTeacher
 from accounts.models import Role
@@ -281,3 +283,18 @@ class TeacherMyClassesView(APIView):
             })
 
         return Response(response_data)
+
+
+class SubjectChaptersView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, subject_id):
+
+        chapters = Chapter.objects.filter(
+            subject_id=subject_id
+        ).order_by("order")
+
+        serializer = ChapterSerializer(chapters, many=True)
+
+        return Response(serializer.data)

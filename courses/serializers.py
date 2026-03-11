@@ -1,3 +1,4 @@
+from .models import Chapter
 from rest_framework import serializers
 from .models import Subject, Course
 
@@ -64,3 +65,10 @@ class CourseSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ("id", "created_at", "updated_at")
+
+
+class ChapterSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Chapter
+        fields = ["id", "title", "order"]

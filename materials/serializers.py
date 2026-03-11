@@ -16,7 +16,7 @@ class MaterialFileSerializer(serializers.ModelSerializer):
 
 class StudyMaterialSerializer(serializers.ModelSerializer):
 
-    files = MaterialFileSerializer(many=True)
+    files = MaterialFileSerializer(many=True, read_only=True)
 
     class Meta:
         model = StudyMaterial

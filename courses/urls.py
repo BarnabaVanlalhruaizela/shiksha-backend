@@ -9,6 +9,7 @@ from .views import (
     DeleteCourseView,
     SubjectDetailView,
     SubjectDashboardView,
+    SubjectChaptersView
 )
 
 urlpatterns = [
@@ -26,7 +27,10 @@ urlpatterns = [
     path("subject/<uuid:subject_id>/", SubjectDetailView.as_view()),
     path("subjects/<uuid:subject_id>/dashboard/", SubjectDashboardView.as_view()
          ),
-
+    path(
+        "subjects/<uuid:subject_id>/chapters/",
+        SubjectChaptersView.as_view(),
+    ),
 
 
 
