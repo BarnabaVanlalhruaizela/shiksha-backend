@@ -1,3 +1,4 @@
+from .models import Recording
 from .models import Chapter
 from rest_framework import serializers
 from .models import Subject, Course
@@ -72,3 +73,18 @@ class ChapterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Chapter
         fields = ["id", "title", "order"]
+
+
+class RecordingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Recording
+        fields = [
+            "id",
+            "title",
+            "subject",
+            "bunny_video_id",
+            "thumbnail_url",
+            "session_date",
+            "duration_seconds",
+            "created_at",
+        ]
