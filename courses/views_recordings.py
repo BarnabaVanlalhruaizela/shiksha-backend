@@ -95,18 +95,42 @@ class CreateVideoSlotView(APIView):
 
 class SaveRecordingView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsTeacher]
 
     def post(self, request, subject_id):
 
         subject = get_object_or_404(Subject, id=subject_id)
 
+        title = request.data.get("title")
+        session_date = request.data.get("session_date")
+        timing = request.data.get("duration")
+        video_id = request.data.get("video_id")
+
+        # convert timing string to seconds (optional simple parser)
+        duration_seconds = None
+
+        if timing:
+            try:
+                start, end = timing.split("-")
+
+                from datetime import datetime
+
+                start_time = datetime.strptime(start.strip(), "%I:%M %p")
+                end_time = datetime.strptime(end.strip(), "%I:%M %p")
+
+                duration_seconds = int(
+                    (end_time - start_time).total_seconds()
+                )
+
+            except Exception:
+                duration_seconds = None
+
         recording = SessionRecording.objects.create(
             subject=subject,
-            title=request.data.get("title"),
-            session_date=request.data.get("session_date"),
-            duration=request.data.get("duration"),
-            bunny_video_id=request.data.get("video_id"),
+            title=title,
+            session_date=session_date,
+            duration_seconds=duration_seconds,
+            bunny_video_id=video_id,
             uploaded_by=request.user,
         )
 
