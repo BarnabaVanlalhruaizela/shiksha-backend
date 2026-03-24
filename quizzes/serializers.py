@@ -157,6 +157,7 @@ class QuizDashboardSerializer(serializers.ModelSerializer):
             "questions_count", 
             "status",
             "score",
+            "is_published",
         ]
 
     def get_questions_count(self, obj):
