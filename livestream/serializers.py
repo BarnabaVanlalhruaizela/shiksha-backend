@@ -3,13 +3,13 @@ from django.utils import timezone
 from django.db.models import Q
 from datetime import timedelta
 import uuid
-import pytz
+from zoneinfo import ZoneInfo  # ✅ modern replacement
 
 from .models import LiveSession
 from courses.models import Subject
 
-# ✅ Define IST timezone
-IST = pytz.timezone("Asia/Kolkata")
+# ✅ IST timezone (built-in, no install needed)
+IST = ZoneInfo("Asia/Kolkata")
 
 
 class LiveSessionCreateSerializer(serializers.ModelSerializer):
@@ -57,15 +57,14 @@ class LiveSessionCreateSerializer(serializers.ModelSerializer):
         end_time = data["end_time"]
 
         # ==================================================
-        # 🔥 CRITICAL FIX: FORCE IST → MAKE AWARE
+        # 🔥 FIX: MAKE DATETIME IST-AWARE (NO pytz)
         # ==================================================
         if timezone.is_naive(start_time):
-            start_time = IST.localize(start_time)
+            start_time = start_time.replace(tzinfo=IST)
 
         if timezone.is_naive(end_time):
-            end_time = IST.localize(end_time)
+            end_time = end_time.replace(tzinfo=IST)
 
-        # Save back
         data["start_time"] = start_time
         data["end_time"] = end_time
 
