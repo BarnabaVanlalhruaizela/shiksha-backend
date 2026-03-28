@@ -85,7 +85,7 @@ class SignupView(APIView):
         token = EmailVerificationToken.generate(user)
 
         verify_link = (
-            f"https://api.shikshacom.com/api/verify-email/?token={token.token}"
+            f"https://api.shikshacom.com/api/accounts/verify-email/?token={token.token}"
         )
 
         html = f"""
@@ -238,7 +238,7 @@ class ResendVerificationEmailView(APIView):
         token = EmailVerificationToken.generate(user)
 
         verify_link = (
-            f"https://api.shikshacom.com/api/verify-email/?token={token.token}"
+            f"https://api.shikshacom.com/api/accounts/verify-email/?token={token.token}"
         )
 
         html = f"""
