@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.db import transaction
+from django.db.models import Q
 
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
@@ -62,6 +63,14 @@ class StudentLiveSessionListView(generics.ListAPIView):
         if subject_id:
             queryset = queryset.filter(subject_id=subject_id)
 
+        now = timezone.now()
+        cutoff = now - timedelta(hours=24)
+
+        queryset = queryset.filter(
+            Q(status__in=[LiveSession.STATUS_SCHEDULED, LiveSession.STATUS_LIVE]) |
+            Q(status=LiveSession.STATUS_COMPLETED, end_time__gte=cutoff)
+        )
+
         return queryset.order_by("start_time")
 
 
@@ -86,9 +95,16 @@ class TeacherLiveSessionListView(generics.ListAPIView):
         if not user.subject_assignments.filter(subject_id=subject_id).exists():
             raise PermissionDenied("Not assigned to this subject.")
 
+        now = timezone.now()
+        cutoff = now - timedelta(hours=24)
+
         return (
             LiveSession.objects
             .filter(subject_id=subject_id)
+            .filter(
+                Q(status__in=[LiveSession.STATUS_SCHEDULED, LiveSession.STATUS_LIVE]) |
+                Q(status=LiveSession.STATUS_COMPLETED, end_time__gte=cutoff)
+            )
             .select_related("course", "subject", "created_by")
             .order_by("start_time")
         )
