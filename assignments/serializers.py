@@ -280,6 +280,7 @@ class TeacherSubmissionListSerializer(serializers.ModelSerializer):
         source="student.profile.full_name",
         read_only=True
     )
+    submission_status = serializers.CharField(read_only=True)
 
     class Meta:
         model = AssignmentSubmission
@@ -290,4 +291,5 @@ class TeacherSubmissionListSerializer(serializers.ModelSerializer):
             "student_name",
             "submitted_file",
             "submitted_at",
+            "submission_status",
         )

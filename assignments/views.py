@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Prefetch
 from django.db.models import Count
+from django.db.models import Case, When, Value, CharField
 from courses.models import Subject
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
@@ -16,6 +17,10 @@ from courses.models import Chapter
 from accounts.models import Role
 from .models import Assignment
 from .serializers import TeacherAssignmentCreateSerializer
+
+from django.http import HttpResponse
+import zipfile
+from io import BytesIO
 
 from .models import AssignmentSubmission
 from .serializers import (
@@ -210,7 +215,10 @@ class TeacherCreateAssignmentView(APIView):
         assignment = serializer.save()
 
         return Response(
-            TeacherAssignmentListSerializer(assignment).data,
+            {
+                "message": "Assignment created successfully",
+                "data": TeacherAssignmentListSerializer(assignment).data
+            },
             status=status.HTTP_201_CREATED
         )
 
@@ -249,7 +257,10 @@ class TeacherUpdateAssignmentView(APIView):
         serializer.save()
 
         return Response(
-            TeacherAssignmentListSerializer(assignment).data
+            {
+                "message": "Assignment updated successfully",
+                "data": TeacherAssignmentListSerializer(assignment).data
+            }
         )
 
 
@@ -331,10 +342,19 @@ class TeacherAssignmentSubmissionsView(generics.ListAPIView):
         ).exists():
             raise PermissionDenied("Not assigned to this subject.")
 
+        
+
         return (
             AssignmentSubmission.objects
             .filter(assignment=assignment)
-            .select_related("student", "student__profile")
+            .select_related("student", "student__profile", "assignment")
+            .annotate(
+                submission_status=Case(
+                    When(submitted_at__gt=assignment.due_date, then=Value("Late")),
+                    default=Value("On time"),
+                    output_field=CharField(),
+                )
+            )
             .order_by("-submitted_at")
         )
 
@@ -376,3 +396,40 @@ class SubjectAssignmentsView(APIView):
             })
 
         return Response(data)
+    
+class DownloadAllSubmissionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, assignment_id):
+        user = request.user
+
+        if not user.has_role(Role.TEACHER):
+            raise PermissionDenied("Only teachers allowed.")
+
+        assignment = get_object_or_404(Assignment, id=assignment_id)
+
+        if not assignment.chapter.subject.subject_teachers.filter(
+            teacher=user
+        ).exists():
+            raise PermissionDenied("Not assigned.")
+
+        submissions = AssignmentSubmission.objects.filter(
+            assignment=assignment
+        )
+
+        buffer = BytesIO()
+        zip_file = zipfile.ZipFile(buffer, "w")
+
+        for sub in submissions:
+            if sub.submitted_file:
+                filename = f"{sub.student.profile.full_name}_{sub.submitted_file.name.split('/')[-1]}"
+                zip_file.writestr(filename, sub.submitted_file.read())
+
+        zip_file.close()
+
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type="application/zip"
+        )
+        response["Content-Disposition"] = "attachment; filename=submissions.zip"
+        return response
