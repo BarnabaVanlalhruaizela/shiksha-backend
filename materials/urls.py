@@ -5,7 +5,8 @@ from .views import (
     DeleteStudyMaterial, 
     SubjectMaterials, 
     StudentSubjectMaterials,
-    StudyMaterialDetail
+    StudyMaterialDetail,
+    UploadTempFile
 )
 urlpatterns = [
 
@@ -37,5 +38,6 @@ urlpatterns = [
         "student/subjects/<uuid:subject_id>/materials/",
         StudentSubjectMaterials.as_view(),
     ),
+    path("files/upload/", UploadTempFile.as_view()),
 
 ]

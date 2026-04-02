@@ -51,6 +51,7 @@ class UploadStudyMaterial(APIView):
         chapter_id = request.data.get("chapter_id")
         custom_chapter = request.data.get("custom_chapter")
 
+        # ✅ Chapter logic
         if chapter_id:
             chapter = get_object_or_404(Chapter, id=chapter_id)
 
@@ -66,7 +67,7 @@ class UploadStudyMaterial(APIView):
             subject = get_object_or_404(Subject, id=subject_id)
 
             chapter = Chapter.objects.create(
-                ubject=subject,
+                subject=subject,
                 title=custom_chapter
             )
 
@@ -77,14 +78,15 @@ class UploadStudyMaterial(APIView):
             )
 
         title = request.data.get("title")
-        files = request.FILES.getlist("files")
+        file_ids = request.data.getlist("file_ids")
 
         if not title:
             return Response({"detail": "Title is required"}, status=400)
 
-        if not files:
+        if not file_ids:
             return Response({"detail": "At least one file required"}, status=400)
 
+        # ✅ CREATE MATERIAL FIRST
         material = StudyMaterial.objects.create(
             chapter=chapter,
             title=title,
@@ -92,8 +94,11 @@ class UploadStudyMaterial(APIView):
             uploaded_by=request.user
         )
 
-        for file in files:
-            MaterialFile.objects.create(material=material, file=file)
+        # ✅ ATTACH FILES
+        for fid in file_ids:
+            file = get_object_or_404(MaterialFile, id=fid)
+            file.material = material
+            file.save()
 
         serializer = StudyMaterialSerializer(material, context={"request": request})
 
@@ -194,3 +199,26 @@ class StudyMaterialDetail(APIView):
         )
 
         return Response(serializer.data)
+    
+class UploadTempFile(APIView):
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+
+        file = request.FILES.get("file")
+
+        if not file:
+            return Response({"detail": "File required"}, status=400)
+
+        temp = MaterialFile.objects.create(
+            file=file,
+            material=None  # 🔥 allow null temporarily
+        )
+
+        return Response({
+            "id": str(temp.id),
+            "file_name": temp.filename(),
+            "file_url": temp.file.url
+        }, status=201)
