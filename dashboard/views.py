@@ -11,12 +11,14 @@ from livestream.models import LiveSession
 from assignments.models import Assignment
 from quizzes.models import Quiz
 from activity.models import Activity
+from sessions_app.models import PrivateSession
 
 from .serializers import (
     DashboardSessionSerializer,
     DashboardAssignmentSerializer,
     DashboardQuizSerializer,
-    DashboardActivitySerializer
+    DashboardActivitySerializer,
+    DashboardPrivateSessionSerializer
 )
 
 
@@ -140,6 +142,19 @@ class DashboardView(APIView):
         # 🔔 COMMON
         # =========================
 
+        # ✅ Private sessions (upcoming, approved/pending)
+        from django.db.models import Q
+        private_sessions = (
+            PrivateSession.objects
+            .filter(
+                Q(teacher=user) | Q(requested_by=user),
+                scheduled_date__gte=timezone.now().date(),
+                status__in=["pending", "approved", "needs_reconfirmation"]
+            )
+            .select_related("teacher", "requested_by")
+            .order_by("scheduled_date", "scheduled_time")
+        )
+
         notifications = (
             Activity.objects
             .filter(user=user)
@@ -159,6 +174,7 @@ class DashboardView(APIView):
             ).data,
             "assignments": DashboardAssignmentSerializer(assignments, many=True).data,
             "quizzes": DashboardQuizSerializer(quizzes, many=True).data,
+            "private_sessions": DashboardPrivateSessionSerializer(private_sessions, many=True).data,
             "notifications": DashboardActivitySerializer(notifications, many=True).data,
             "schedule": DashboardActivitySerializer(schedule, many=True).data
         })

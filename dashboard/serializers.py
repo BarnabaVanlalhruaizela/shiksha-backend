@@ -3,6 +3,7 @@ from quizzes.models import Quiz
 from assignments.models import Assignment
 from rest_framework import serializers
 from livestream.models import LiveSession
+from sessions_app.models import PrivateSession
 
 
 class DashboardSessionSerializer(serializers.ModelSerializer):
@@ -69,6 +70,28 @@ class DashboardQuizSerializer(serializers.ModelSerializer):
             "due",
             "subject_id",
             "subject_name",
+        ]
+
+
+class DashboardPrivateSessionSerializer(serializers.ModelSerializer):
+
+    student = serializers.CharField(source="requested_by.email")
+    teacher_name = serializers.CharField(source="teacher.email")
+    date = serializers.DateField(source="scheduled_date")
+    time = serializers.TimeField(source="scheduled_time")
+
+    class Meta:
+        model = PrivateSession
+        fields = [
+            "id",
+            "subject",
+            "student",
+            "teacher_name",
+            "date",
+            "time",
+            "duration_minutes",
+            "status",
+            "session_type",
         ]
 
 
