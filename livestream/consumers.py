@@ -20,39 +20,39 @@ class LiveSessionConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
 
-        # 🔥 SEND INITIAL STATE (CRITICAL)
+        # 🔥 GET STATE FROM REDIS
         state = await database_sync_to_async(get_session_state)(self.session_id)
 
+        # 🔥 FALLBACK TO DB
         if not state:
-            # fallback to DB
             session = await database_sync_to_async(
                 LiveSession.objects.get
             )(id=self.session_id)
 
             state = {
-                "status": session.status,
+                "status": session.computed_status(),  # ✅ FIXED
                 "teacher_left_at": (
                     session.teacher_left_at.isoformat()
                     if session.teacher_left_at else None
                 ),
             }
 
+            # save to Redis
             await database_sync_to_async(set_session_state)(session)
 
+        # 🔥 SEND INITIAL STATE
         await self.send(text_data=json.dumps({
             "type": "initial_state",
             "data": state
         }))
 
     async def disconnect(self, close_code):
-        # leave group
         await self.channel_layer.group_discard(
             self.group_name,
             self.channel_name
         )
 
     async def session_update(self, event):
-        # send update to frontend
         await self.send(text_data=json.dumps({
             "type": "session_update",
             "data": event["data"]
