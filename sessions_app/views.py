@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from livestream.services import generate_livekit_token
+from livestream.services.token import generate_livekit_token
 
 from .models import PrivateSession, SessionParticipant, SessionRescheduleHistory
 from .permissions import IsTeacher, IsStudent
@@ -59,7 +59,8 @@ def request_session(request):
     )
 
     # Create participant entry for the requesting student
-    SessionParticipant.objects.create(session=session, user=request.user, role="student")
+    SessionParticipant.objects.create(
+        session=session, user=request.user, role="student")
 
     # If group session, add extra student_ids as participants
     for sid in d.get("student_ids", []):
@@ -95,7 +96,8 @@ def student_sessions(request):
     ).distinct()
 
     if tab == "scheduled":
-        qs = qs.filter(status__in=["approved", "ongoing", "needs_reconfirmation"])
+        qs = qs.filter(
+            status__in=["approved", "ongoing", "needs_reconfirmation"])
     elif tab == "requests":
         qs = qs.filter(status="pending")
     elif tab == "history":
@@ -114,7 +116,8 @@ def student_sessions(request):
 def cancel_session(request, session_id):
     """Student cancels a pending or approved session they requested."""
     try:
-        session = PrivateSession.objects.get(pk=session_id, requested_by=request.user)
+        session = PrivateSession.objects.get(
+            pk=session_id, requested_by=request.user)
     except PrivateSession.DoesNotExist:
         return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -135,7 +138,8 @@ def cancel_session(request, session_id):
 def confirm_reschedule(request, session_id):
     """Student confirms a teacher's reschedule proposal."""
     try:
-        session = PrivateSession.objects.get(pk=session_id, requested_by=request.user)
+        session = PrivateSession.objects.get(
+            pk=session_id, requested_by=request.user)
     except PrivateSession.DoesNotExist:
         return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -159,7 +163,8 @@ def confirm_reschedule(request, session_id):
 def decline_reschedule(request, session_id):
     """Student declines a teacher's reschedule proposal → session is declined."""
     try:
-        session = PrivateSession.objects.get(pk=session_id, requested_by=request.user)
+        session = PrivateSession.objects.get(
+            pk=session_id, requested_by=request.user)
     except PrivateSession.DoesNotExist:
         return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -170,7 +175,8 @@ def decline_reschedule(request, session_id):
         )
 
     session.status = "declined"
-    session.decline_reason = request.data.get("reason", "Student declined reschedule.")
+    session.decline_reason = request.data.get(
+        "reason", "Student declined reschedule.")
     session.save()
     return Response(PrivateSessionSerializer(session).data)
 
@@ -217,7 +223,8 @@ def teacher_history(request):
 def accept_request(request, session_id):
     """Teacher accepts a pending session request."""
     try:
-        session = PrivateSession.objects.get(pk=session_id, teacher=request.user)
+        session = PrivateSession.objects.get(
+            pk=session_id, teacher=request.user)
     except PrivateSession.DoesNotExist:
         return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -244,7 +251,8 @@ def accept_request(request, session_id):
 def decline_request(request, session_id):
     """Teacher declines a pending session request."""
     try:
-        session = PrivateSession.objects.get(pk=session_id, teacher=request.user)
+        session = PrivateSession.objects.get(
+            pk=session_id, teacher=request.user)
     except PrivateSession.DoesNotExist:
         return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -265,7 +273,8 @@ def decline_request(request, session_id):
 def reschedule_request(request, session_id):
     """Teacher proposes a new date/time for a pending or approved session."""
     try:
-        session = PrivateSession.objects.get(pk=session_id, teacher=request.user)
+        session = PrivateSession.objects.get(
+            pk=session_id, teacher=request.user)
     except PrivateSession.DoesNotExist:
         return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -308,7 +317,8 @@ def reschedule_request(request, session_id):
 def teacher_cancel_session(request, session_id):
     """Teacher cancels a pending, approved, or needs_reconfirmation session."""
     try:
-        session = PrivateSession.objects.get(pk=session_id, teacher=request.user)
+        session = PrivateSession.objects.get(
+            pk=session_id, teacher=request.user)
     except PrivateSession.DoesNotExist:
         return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -332,7 +342,8 @@ def start_session(request, session_id):
     Creates a LiveKit room name and marks session as ongoing.
     """
     try:
-        session = PrivateSession.objects.get(pk=session_id, teacher=request.user)
+        session = PrivateSession.objects.get(
+            pk=session_id, teacher=request.user)
     except PrivateSession.DoesNotExist:
         return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -355,7 +366,8 @@ def start_session(request, session_id):
 def end_session(request, session_id):
     """Teacher ends an ongoing session."""
     try:
-        session = PrivateSession.objects.get(pk=session_id, teacher=request.user)
+        session = PrivateSession.objects.get(
+            pk=session_id, teacher=request.user)
     except PrivateSession.DoesNotExist:
         return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
