@@ -10,7 +10,7 @@ class SubjectSerializer(serializers.ModelSerializer):
 
     stream_name = serializers.SerializerMethodField()
     course_title = serializers.SerializerMethodField()
-    board = serializers.SerializerMethodField()
+    board_name = serializers.SerializerMethodField()   # ✅ NEW
 
     class Meta:
         model = Subject
@@ -22,18 +22,17 @@ class SubjectSerializer(serializers.ModelSerializer):
             "chapters",
             "stream_name",
             "course_title",
-            "board",
+            "board_name",   # ✅ USE THIS
         )
 
     def get_stream_name(self, obj):
-        if obj.course and obj.course.stream:
-            return obj.course.stream.name
-        return ""
+        return obj.course.stream.name if obj.course and obj.course.stream else ""
 
     def get_course_title(self, obj):
-        if obj.course:
-            return obj.course.title
-        return ""
+        return obj.course.title if obj.course else ""
+
+    def get_board_name(self, obj):   # ✅ NEW
+        return obj.course.board.name if obj.course and obj.course.board else ""
 
     def get_teachers(self, obj):
         subject_teachers = (
@@ -42,25 +41,26 @@ class SubjectSerializer(serializers.ModelSerializer):
             .order_by("order")
         )
 
-        data = []
-
-        for st in subject_teachers:
-            teacher = st.teacher
-            profile = getattr(teacher, "teacher_profile", None)
-
-            data.append({
-                "id": teacher.id,
-                "name": getattr(teacher, 'profile', None) and teacher.profile.full_name or teacher.username,
+        return [
+            {
+                "id": st.teacher.id,
+                "name": getattr(st.teacher, 'profile', None)
+                and st.teacher.profile.full_name
+                or st.teacher.username,
                 "display_role": st.display_role,
-                "qualification": profile.qualification if profile else "",
-                "bio": profile.bio if profile else "",
-                "rating": profile.rating if profile else None,
-                "photo": profile.photo.url if profile and profile.photo else None,
-            })
+                "qualification": getattr(st.teacher.teacher_profile, "qualification", ""),
+                "bio": getattr(st.teacher.teacher_profile, "bio", ""),
+                "rating": getattr(st.teacher.teacher_profile, "rating", None),
+                "photo": (
+                    st.teacher.teacher_profile.photo.url
+                    if getattr(st.teacher, "teacher_profile", None)
+                    and st.teacher.teacher_profile.photo
+                    else None
+                ),
+            }
+            for st in subject_teachers
+        ]
 
-        return data
-
-    # ✅ NEW METHOD
     def get_chapters(self, obj):
         return [
             {
@@ -70,15 +70,6 @@ class SubjectSerializer(serializers.ModelSerializer):
             }
             for ch in obj.chapters.all().order_by("order")
         ]
-
-    def get_board(self, obj):
-        if not obj.course or not obj.course.board:
-            return None
-        return {
-            "id": str(obj.course.board.id),
-            "name": obj.course.board.name,
-            "board_type": obj.course.board.board_type,
-        }
 
 
 class BoardSerializer(serializers.ModelSerializer):
