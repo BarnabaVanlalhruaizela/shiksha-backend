@@ -254,7 +254,27 @@ def create_live_session(request):
     )
 
     if serializer.is_valid():
-        session = serializer.save()
+        start_time = serializer.validated_data["start_time"]
+        now = timezone.now()
+
+        # 🔥 SUPPORT START NOW + FORCE LIVE
+        force_live = request.data.get("force_live", False)
+
+        if force_live or start_time <= now:
+            status = LiveSession.STATUS_LIVE
+        else:
+            status = LiveSession.STATUS_SCHEDULED
+
+        session = serializer.save(
+            created_by=request.user,
+            status=status
+        )
+
+        # 🔥 ensure teacher_left_at cleared if starting live
+        if status == LiveSession.STATUS_LIVE:
+            session.teacher_left_at = None
+            session.save(update_fields=["teacher_left_at"])
+
         return Response(
             {
                 "id": session.id,
@@ -265,11 +285,11 @@ def create_live_session(request):
         )
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 # =========================
 # CANCEL SESSION
 # =========================
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def cancel_live_session(request, session_id):

@@ -88,38 +88,44 @@ class LiveSession(models.Model):
         return self.end_time - self.start_time
 
     # 🔥 CORE STATE LOGIC (VERY IMPORTANT)
+
     def computed_status(self):
         from django.utils import timezone
         from datetime import timedelta
 
         now = timezone.now()
 
+        # 1️⃣ Hard override
         if self.status == self.STATUS_CANCELLED:
             return self.STATUS_CANCELLED
 
+        # 2️⃣ Teacher left logic (highest priority)
         if self.teacher_left_at:
             diff = now - self.teacher_left_at
 
-        # 🔥 NEW SMART LOGIC
-
-        # 0–10 min → reconnecting
             if diff <= timedelta(minutes=10):
                 return self.STATUS_RECONNECTING
 
-        # 10–60 min → paused
             if diff <= timedelta(minutes=60):
                 return self.STATUS_PAUSED
 
-        # >60 min → completed
             return self.STATUS_COMPLETED
 
-        if self.status == self.STATUS_LIVE and not self.teacher_left_at:
-            return self.STATUS_LIVE
-
+        # 3️⃣ Live session
+        if self.status == self.STATUS_LIVE:
+            if now <= self.end_time:
+                return self.STATUS_LIVE
+            return self.STATUS_COMPLETED
+        # 4️⃣ Scheduled
         if now < self.start_time:
             return self.STATUS_SCHEDULED
 
-        return self.STATUS_WAITING
+        # 5️⃣ Waiting (only before end_time)
+        if now <= self.end_time:
+            return self.STATUS_WAITING
+
+        # 6️⃣ Fallback → completed
+        return self.STATUS_COMPLETED
 
 
 class LiveSessionAttendance(models.Model):
