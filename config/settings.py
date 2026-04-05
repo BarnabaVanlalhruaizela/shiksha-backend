@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "forum",
     "sessions_app",
     "channels",
+    "news",
 ]
 
 MIDDLEWARE = [
