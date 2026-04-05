@@ -56,6 +56,15 @@ class PrivateSessionAdmin(admin.ModelAdmin):
 
     inlines = [SessionParticipantInline]
 
+    # 🔥 FIX: Bulk delete (admin action)
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            obj.delete()
+
+    # 🔥 FIX: Single delete
+    def delete_model(self, request, obj):
+        obj.delete()
+
 
 # ---------------------------------------------------------
 # Participant Admin
@@ -110,4 +119,5 @@ class ChatMessageAdmin(admin.ModelAdmin):
 
     def message_preview(self, obj):
         return obj.message[:50]
+
     message_preview.short_description = "Message"
