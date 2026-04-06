@@ -494,7 +494,6 @@ def join_private_session(request, session_id):
             session=session,
             is_teacher=is_teacher,
             display_name=display_name,
-            allow_publish=True,  # Private sessions: everyone can publish
         )
     except Exception:
         logger.exception("LiveKit token generation failed for private session")
