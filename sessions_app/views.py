@@ -427,6 +427,10 @@ def end_session(request, session_id):
     session.status = "completed"
     session.ended_at = timezone.now()
     session.save()
+
+    # Clean up chat messages — no longer needed after session ends
+    ChatMessage.objects.filter(session=session).delete()
+
     return Response(PrivateSessionSerializer(session).data)
 
 
