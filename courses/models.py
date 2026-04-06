@@ -57,8 +57,14 @@ class Subject(models.Model):
     )
 
     name = models.CharField(max_length=100)
-
-    order = models.PositiveIntegerField(default=0)
+    image = ProcessedImageField(
+        upload_to="subjects/images/",
+        processors=[ResizeToFill(800, 400)],
+        format="WEBP",          # smaller than JPG/PNG
+        options={"quality": 80},
+        blank=True,
+        null=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
