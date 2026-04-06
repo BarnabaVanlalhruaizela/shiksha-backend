@@ -196,7 +196,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
 class SessionRequestSerializer(serializers.Serializer):
     teacher_id = serializers.UUIDField()
-    subject = serializers.CharField(max_length=255)
+    subject_id = serializers.UUIDField()  # ✅ FIXED
     scheduled_date = serializers.DateField()
     scheduled_time = serializers.TimeField()
     duration_minutes = serializers.IntegerField(default=60)
@@ -210,21 +210,20 @@ class SessionRequestSerializer(serializers.Serializer):
     )
 
     def validate(self, data):
-        scheduled_date = data["scheduled_date"]
-        scheduled_time = data["scheduled_time"]
+        from django.utils import timezone
+        from datetime import datetime
 
-        scheduled_dt = datetime.combine(scheduled_date, scheduled_time)
+        scheduled_dt = timezone.make_aware(
+            datetime.combine(data["scheduled_date"], data["scheduled_time"])
+        )
 
         if scheduled_dt < timezone.now():
-            raise serializers.ValidationError(
-                "Cannot schedule session in the past.")
+            raise serializers.ValidationError("Cannot schedule in the past.")
 
         if data["duration_minutes"] <= 0:
-            raise serializers.ValidationError("Duration must be positive.")
+            raise serializers.ValidationError("Invalid duration.")
 
         if data["session_type"] == "group" and data["group_strength"] <= 1:
-            raise serializers.ValidationError(
-                "Group session must have more than 1 participant."
-            )
+            raise serializers.ValidationError("Group must be >1.")
 
         return data

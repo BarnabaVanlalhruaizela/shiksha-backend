@@ -516,3 +516,38 @@ class TeacherAllStudentsView(APIView):
             "total_students": len(students),
             "students": students,
         })
+
+# =========================
+# STUDENT'S OWN SUBJECTS
+# =========================
+
+
+class MySubjectsView(APIView):
+    """
+    Returns subjects for the student's active enrolled course(s).
+    Used by the private session request form subject dropdown.
+    GET /courses/subjects/mine/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get all active enrollments for this student
+        course_ids = Enrollment.objects.filter(
+            user=request.user,
+            status=Enrollment.STATUS_ACTIVE,
+        ).values_list("course_id", flat=True)
+
+        if not course_ids:
+            return Response([])
+
+        subjects = (
+            Subject.objects
+            .filter(course_id__in=course_ids)
+            .select_related("course")
+            .order_by("course__title", "order")
+        )
+
+        return Response([
+            {"id": str(s.id), "name": s.name}
+            for s in subjects
+        ])

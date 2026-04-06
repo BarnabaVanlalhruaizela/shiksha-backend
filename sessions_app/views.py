@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsStudent])
 def request_session(request):
-    """Student requests a new private session with a teacher."""
     ser = SessionRequestSerializer(data=request.data)
     ser.is_valid(raise_exception=True)
     d = ser.validated_data
@@ -46,36 +45,31 @@ def request_session(request):
 
     # ✅ Validate subject
     try:
-        subject_obj = Subject.objects.get(name=d["subject"])
+        subject_obj = Subject.objects.get(id=d["subject_id"])
     except Subject.DoesNotExist:
         return Response({"error": "Invalid subject"}, status=400)
 
     # ✅ Validate teacher teaches subject
-    is_valid_teacher = SubjectTeacher.objects.filter(
+    if not SubjectTeacher.objects.filter(
         subject=subject_obj,
         teacher_id=d["teacher_id"]
-    ).exists()
-
-    if not is_valid_teacher:
+    ).exists():
         return Response(
-            {"error": "This teacher does not teach the selected subject"},
+            {"error": "Teacher does not teach this subject"},
             status=400
         )
 
-    # ✅ Fetch teacher
+    # ✅ Get teacher
     try:
         teacher = User.objects.get(pk=d["teacher_id"])
     except User.DoesNotExist:
-        return Response({"error": "Teacher not found."}, status=404)
-
-    if not teacher.has_role("TEACHER"):
-        return Response({"error": "Selected user is not a teacher."}, status=400)
+        return Response({"error": "Teacher not found"}, status=404)
 
     # ✅ Create session
     session = PrivateSession.objects.create(
         teacher=teacher,
         requested_by=request.user,
-        subject=d["subject"],
+        subject=subject_obj.name,  # store name
         scheduled_date=d["scheduled_date"],
         scheduled_time=d["scheduled_time"],
         duration_minutes=d["duration_minutes"],
@@ -85,29 +79,16 @@ def request_session(request):
         status="pending",
     )
 
-    # ✅ Add main student
+    # ✅ Add requester
     SessionParticipant.objects.create(
         session=session,
         user=request.user,
         role="student"
     )
 
-    # ✅ Add group students
-    for sid in d.get("student_ids", []):
-        try:
-            extra = User.objects.get(profile__student_id=sid)
-            if extra != request.user:
-                SessionParticipant.objects.get_or_create(
-                    session=session,
-                    user=extra,
-                    defaults={"role": "student"}
-                )
-        except User.DoesNotExist:
-            pass
-
     return Response(
         PrivateSessionSerializer(session).data,
-        status=status.HTTP_201_CREATED
+        status=201
     )
 
 
@@ -421,7 +402,7 @@ def start_session(request, session_id):
 
     room_name = f"private-{session.id}"
     session.status = "ongoing"
-    session.room_name = room_name
+    session.room_name = f"private_{session.id}"
     session.started_at = timezone.now()
     session.save()
     return Response(PrivateSessionSerializer(session).data)
@@ -659,6 +640,26 @@ def subject_teachers(request, subject_id):
             "name": getattr(st.teacher.profile, "full_name", st.teacher.username),
         }
         for st in qs
+    ]
+
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def subject_teachers(request, subject_id):
+    from courses.models import SubjectTeacher
+
+    teachers = SubjectTeacher.objects.filter(
+        subject_id=subject_id
+    ).select_related("teacher")
+
+    data = [
+        {
+            "id": str(t.teacher.id),
+            "name": get_user_name(t.teacher),
+        }
+        for t in teachers
     ]
 
     return Response(data)
