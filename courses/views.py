@@ -145,10 +145,8 @@ class CourseSubjectsView(APIView):
             .order_by("order")
         )
 
-        serializer = SubjectSerializer(subjects, many=True)
+        serializer = SubjectSerializer(subjects, many=True, context={'request': request})  # ← fixed
         return Response(serializer.data)
-
-
 # =========================
 # SUBJECT DETAIL
 # =========================
@@ -551,3 +549,4 @@ class MySubjectsView(APIView):
             {"id": str(s.id), "name": s.name}
             for s in subjects
         ])
+
