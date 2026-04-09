@@ -36,6 +36,7 @@ ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "api.shikshacom.com",
+    "dev.api.shikshacom.com",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -199,6 +200,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://app.shikshacom.com",
     "https://teacher.shikshacom.com",
     "http://68.183.81.236:8000",
+    "https://dev.api.shikshacom.com",
 ]
 CORS_ALLOWED_ORIGINS = [
     "https://shikshacom.com",
