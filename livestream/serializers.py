@@ -13,6 +13,7 @@ IST = ZoneInfo("Asia/Kolkata")
 
 class LiveSessionCreateSerializer(serializers.ModelSerializer):
     subject_id = serializers.UUIDField(write_only=True)
+    force_live = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = LiveSession
@@ -23,6 +24,7 @@ class LiveSessionCreateSerializer(serializers.ModelSerializer):
             "start_time",
             "end_time",
             "subject_id",
+            "force_live",
         ]
         read_only_fields = ["id"]
 
