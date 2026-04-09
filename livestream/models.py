@@ -97,10 +97,12 @@ class LiveSession(models.Model):
         if self.status == self.STATUS_CANCELLED:
             return self.STATUS_CANCELLED
 
+        # Session end time has passed → completed
+        if now >= self.end_time:
+            return self.STATUS_COMPLETED
+
         if self.teacher_left_at:
             diff = now - self.teacher_left_at
-
-        # 🔥 NEW SMART LOGIC
 
         # 0–10 min → reconnecting
             if diff <= timedelta(minutes=10):
