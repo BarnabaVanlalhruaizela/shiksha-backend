@@ -68,7 +68,8 @@ class LiveSessionCreateSerializer(serializers.ModelSerializer):
                 {"end_time": ["End time must be after start time."]}
             )
 
-        if start_time <= now:
+        force_live = data.pop("force_live", False)
+        if not force_live and start_time <= now:
             raise serializers.ValidationError(
                 {"start_time": ["Cannot schedule a session in the past."]}
             )
